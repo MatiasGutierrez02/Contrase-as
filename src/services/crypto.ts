@@ -45,6 +45,20 @@ export async function generateVaultKeyPair(): Promise<VaultKeyPair> {
   );
 }
 
+export async function makePrivateKeyNonExtractable(
+  privateKey: CryptoKey,
+): Promise<CryptoKey> {
+  if (!privateKey.extractable) return privateKey;
+  const exported = await crypto.subtle.exportKey("pkcs8", privateKey);
+  return crypto.subtle.importKey(
+    "pkcs8",
+    exported,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["unwrapKey"],
+  );
+}
+
 export async function encryptCredentials(
   credentials: Credentials,
   publicKey: CryptoKey,

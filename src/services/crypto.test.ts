@@ -3,6 +3,7 @@ import {
   decryptCredentials,
   encryptCredentials,
   generateVaultKeyPair,
+  makePrivateKeyNonExtractable,
   protectPrivateKey,
   unprotectPrivateKey,
 } from "./crypto";
@@ -66,5 +67,17 @@ describe("cifrado híbrido de credenciales", () => {
       ),
     ).rejects.toThrow();
     expect(unlockedKey.extractable).toBe(false);
+  });
+
+  it("convierte la clave privada local en no extraíble", async () => {
+    const keyPair = await generateVaultKeyPair();
+    const localPrivateKey = await makePrivateKeyNonExtractable(
+      keyPair.privateKey,
+    );
+
+    expect(localPrivateKey.extractable).toBe(false);
+    await expect(
+      crypto.subtle.exportKey("pkcs8", localPrivateKey),
+    ).rejects.toThrow();
   });
 });

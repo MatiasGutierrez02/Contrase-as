@@ -1,11 +1,8 @@
-export interface PrfCredentialRegistration {
+export interface StoredWebAuthnCredential {
   credentialId: ArrayBuffer;
-  prfSalt: Uint8Array<ArrayBuffer>;
-  prfOutput: ArrayBuffer;
 }
 
-export interface StoredPrfCredential {
-  credentialId: ArrayBuffer;
+export interface StoredLegacyPrfCredential extends StoredWebAuthnCredential {
   prfSalt: Uint8Array<ArrayBuffer>;
 }
 
@@ -16,9 +13,8 @@ export class WebAuthnSecurityError extends Error {
   }
 }
 
-export async function registerPrfCredential(): Promise<PrfCredentialRegistration> {
+export async function registerWebAuthnCredential(): Promise<StoredWebAuthnCredential> {
   await assertWebAuthnAvailable();
-  const prfSalt = crypto.getRandomValues(new Uint8Array(32));
   const credential = await performWebAuthn(
     "No se pudo registrar la autenticación del dispositivo.",
     () =>
@@ -42,59 +38,64 @@ export async function registerPrfCredential(): Promise<PrfCredentialRegistration
           },
           attestation: "none",
           timeout: 60_000,
-          extensions: { prf: { eval: { first: prfSalt } } },
-        } as PublicKeyCredentialCreationOptions,
+        },
       }),
   );
-
-  if (!(credential instanceof PublicKeyCredential))
+  if (!(credential instanceof PublicKeyCredential)) {
     throw new WebAuthnSecurityError(
       "El navegador no devolvió una credencial WebAuthn válida.",
     );
-  const extension = credential.getClientExtensionResults().prf;
-  if (extension?.enabled !== true) {
-    throw new WebAuthnSecurityError(
-      "Este dispositivo no admite la extensión PRF requerida para proteger la bóveda.",
-    );
   }
-
-  const stored = { credentialId: credential.rawId.slice(0), prfSalt };
-  const prfOutput = extension.results?.first
-    ? copyBuffer(extension.results.first)
-    : await authenticateWithPrf(stored);
-  return { ...stored, prfOutput };
+  return { credentialId: credential.rawId.slice(0) };
 }
 
-export async function authenticateWithPrf(
-  credential: StoredPrfCredential,
-): Promise<ArrayBuffer> {
-  await assertWebAuthnAvailable();
-  const assertion = await performWebAuthn(
-    "No se pudo autenticar el acceso a la bóveda.",
-    () =>
-      navigator.credentials.get({
-        publicKey: {
-          challenge: crypto.getRandomValues(new Uint8Array(32)),
-          allowCredentials: [
-            { id: credential.credentialId, type: "public-key" },
-          ],
-          userVerification: "required",
-          timeout: 60_000,
-          extensions: { prf: { eval: { first: credential.prfSalt } } },
-        } as PublicKeyCredentialRequestOptions,
-      }),
-  );
-  if (!(assertion instanceof PublicKeyCredential))
+export async function authenticateWebAuthn(
+  credential: StoredWebAuthnCredential,
+): Promise<void> {
+  const assertion = await requestAssertion(credential);
+  if (!(assertion instanceof PublicKeyCredential)) {
     throw new WebAuthnSecurityError(
       "El navegador no devolvió una autenticación WebAuthn válida.",
     );
+  }
+}
+
+export async function authenticateLegacyPrf(
+  credential: StoredLegacyPrfCredential,
+): Promise<ArrayBuffer> {
+  const assertion = await requestAssertion(credential, {
+    prf: { eval: { first: credential.prfSalt } },
+  });
+  if (!(assertion instanceof PublicKeyCredential)) {
+    throw new WebAuthnSecurityError(
+      "El navegador no devolvió una autenticación WebAuthn válida.",
+    );
+  }
   const result = assertion.getClientExtensionResults().prf?.results?.first;
   if (!result || result.byteLength !== 32) {
     throw new WebAuthnSecurityError(
-      "La autenticación se completó, pero el dispositivo no entregó el resultado PRF requerido.",
+      "Esta bóveda todavía requiere PRF para migrar su clave, pero el dispositivo no entregó el resultado necesario.",
     );
   }
   return copyBuffer(result);
+}
+
+async function requestAssertion(
+  credential: StoredWebAuthnCredential,
+  extensions?: AuthenticationExtensionsClientInputs,
+): Promise<Credential | null> {
+  await assertWebAuthnAvailable();
+  return performWebAuthn("No se pudo autenticar el acceso a la bóveda.", () =>
+    navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ id: credential.credentialId, type: "public-key" }],
+        userVerification: "required",
+        timeout: 60_000,
+        extensions,
+      },
+    }),
+  );
 }
 
 function copyBuffer(source: BufferSource): ArrayBuffer {
@@ -115,9 +116,9 @@ async function assertWebAuthnAvailable(): Promise<void> {
       "WebAuthn no está disponible en este navegador.",
     );
   }
-  const platformAvailable =
-    await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-  if (!platformAvailable) {
+  if (
+    !(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())
+  ) {
     throw new WebAuthnSecurityError(
       "No hay un autenticador de dispositivo con verificación de usuario disponible.",
     );
@@ -141,7 +142,7 @@ async function performWebAuthn<T>(
     }
     if (cause instanceof DOMException && cause.name === "NotSupportedError") {
       throw new WebAuthnSecurityError(
-        "El navegador o autenticador no soporta WebAuthn con PRF.",
+        "El navegador o autenticador no soporta el flujo WebAuthn requerido.",
       );
     }
     throw new WebAuthnSecurityError(fallback);

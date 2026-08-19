@@ -8,15 +8,17 @@ import type {
 } from "@/models/PasswordEntry";
 import { isPlaintextPasswordRecord } from "@/models/PasswordEntry";
 import {
-  authenticateWithPrf,
-  registerPrfCredential,
-  type StoredPrfCredential,
+  authenticateLegacyPrf,
+  authenticateWebAuthn,
+  registerWebAuthnCredential,
+  type StoredLegacyPrfCredential,
+  type StoredWebAuthnCredential,
 } from "@/services/biometric";
 import {
   decryptCredentials,
   encryptCredentials,
   generateVaultKeyPair,
-  protectPrivateKey,
+  makePrivateKeyNonExtractable,
   unprotectPrivateKey,
   type ProtectedPrivateKey,
   type VaultKeyPair,
@@ -32,11 +34,20 @@ interface ProtectedStoredVaultKeyPair {
   id: "primary";
   publicKey: CryptoKey;
   protectedPrivateKey: ProtectedPrivateKey;
-  webAuthn: StoredPrfCredential;
+  webAuthn: StoredLegacyPrfCredential;
   privateKey?: never;
 }
 
-type StoredVaultKeys = LegacyStoredVaultKeyPair | ProtectedStoredVaultKeyPair;
+interface LocalStoredVaultKeyPair extends VaultKeyPair {
+  id: "primary";
+  webAuthn: StoredWebAuthnCredential;
+  protectedPrivateKey?: never;
+}
+
+type StoredVaultKeys =
+  | LegacyStoredVaultKeyPair
+  | ProtectedStoredVaultKeyPair
+  | LocalStoredVaultKeyPair;
 
 export class PasswordVaultDatabase extends Dexie {
   passwords!: EntityTable<StoredPasswordRecord, "id">;
@@ -90,6 +101,12 @@ function isProtected(
   return "protectedPrivateKey" in keys;
 }
 
+function isWebAuthnRegistered(
+  keys: StoredVaultKeys,
+): keys is LocalStoredVaultKeyPair {
+  return "webAuthn" in keys && "privateKey" in keys;
+}
+
 export function createVaultKeyProvider(
   database: PasswordVaultDatabase,
 ): VaultKeyProvider {
@@ -101,27 +118,38 @@ export function createVaultKeyProvider(
     async unlockPrivateKey() {
       const keys = await getStoredKeys(database);
       if (isProtected(keys)) {
-        const prfOutput = await authenticateWithPrf(keys.webAuthn);
-        return unprotectPrivateKey(keys.protectedPrivateKey, prfOutput);
+        const prfOutput = await authenticateLegacyPrf(keys.webAuthn);
+        const privateKey = await unprotectPrivateKey(
+          keys.protectedPrivateKey,
+          prfOutput,
+        );
+        const migratedKeys: LocalStoredVaultKeyPair = {
+          id: "primary",
+          publicKey: keys.publicKey,
+          privateKey,
+          webAuthn: { credentialId: keys.webAuthn.credentialId },
+        };
+        await database.cryptoKeys.put(migratedKeys);
+        keyPairPromises.set(database, Promise.resolve(migratedKeys));
+        return privateKey;
       }
 
-      const registration = await registerPrfCredential();
-      const protectedPrivateKey = await protectPrivateKey(
-        keys.privateKey,
-        registration.prfOutput,
-      );
-      const protectedKeys: ProtectedStoredVaultKeyPair = {
+      if (isWebAuthnRegistered(keys)) {
+        await authenticateWebAuthn(keys.webAuthn);
+        return keys.privateKey;
+      }
+
+      const webAuthn = await registerWebAuthnCredential();
+      const privateKey = await makePrivateKeyNonExtractable(keys.privateKey);
+      const registeredKeys: LocalStoredVaultKeyPair = {
         id: "primary",
         publicKey: keys.publicKey,
-        protectedPrivateKey,
-        webAuthn: {
-          credentialId: registration.credentialId,
-          prfSalt: registration.prfSalt,
-        },
+        privateKey,
+        webAuthn,
       };
-      await database.cryptoKeys.put(protectedKeys);
-      keyPairPromises.set(database, Promise.resolve(protectedKeys));
-      return unprotectPrivateKey(protectedPrivateKey, registration.prfOutput);
+      await database.cryptoKeys.put(registeredKeys);
+      keyPairPromises.set(database, Promise.resolve(registeredKeys));
+      return privateKey;
     },
   };
 }
