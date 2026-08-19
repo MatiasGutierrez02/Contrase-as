@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterView } from "vue-router";
+import PwaStatus from "@/components/PwaStatus.vue";
 </script>
 
 <template>
@@ -8,4 +9,5 @@ import { RouterView } from "vue-router";
       <component :is="Component" />
     </Transition>
   </RouterView>
+  <PwaStatus />
 </template>

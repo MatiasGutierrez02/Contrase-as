@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import AppHeader from "@/components/AppHeader.vue";
 import { usePasswordsStore } from "@/stores/passwords";
 
@@ -14,6 +14,10 @@ const saving = ref(false);
 const passwordVisible = ref(false);
 const entryExists = ref(!isEditing.value);
 const form = reactive({ name: "", username: "", password: "" });
+
+onBeforeRouteLeave(() => {
+  passwords.lock();
+});
 
 onMounted(async () => {
   if (!isEditing.value || !Number.isInteger(id.value)) {
@@ -66,7 +70,12 @@ async function submitForm() {
       :title="isEditing ? 'Editar cuenta' : 'Nueva cuenta'"
       :back-to="isEditing ? `/passwords/${id}` : '/'"
     />
-    <section v-if="loading" class="empty-state">
+    <section
+      v-if="loading"
+      class="empty-state loading-state"
+      aria-live="polite"
+    >
+      <span class="loading-spinner" aria-hidden="true"></span>
       <p>Cargando contraseña…</p>
     </section>
     <section v-else-if="passwords.error" class="empty-state empty-state--error">

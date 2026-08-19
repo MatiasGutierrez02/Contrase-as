@@ -1,7 +1,8 @@
 {
   "name": "password-vault-pwa",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Gestor personal de contraseñas local, cifrado e instalable como PWA",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -49,14 +49,24 @@ export const usePasswordsStore = defineStore("passwords", () => {
 
   async function create(entry: PasswordEntryInput) {
     const id = await run(() => passwordRepository.create(entry));
-    await loadAll();
+    entries.value = [...entries.value, { id, name: entry.name }].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
     return id;
   }
 
   async function update(id: number, entry: PasswordEntryInput) {
     await run(() => passwordRepository.update(id, entry));
     unlockedEntry.value = { id, ...entry };
-    await loadAll();
+    entries.value = entries.value
+      .map((summary) =>
+        summary.id === id ? { id, name: entry.name } : summary,
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function lock() {
+    unlockedEntry.value = undefined;
   }
 
   async function remove(id: number) {
@@ -73,6 +83,7 @@ export const usePasswordsStore = defineStore("passwords", () => {
     loadAll,
     unlockAndGet,
     getForEditing,
+    lock,
     create,
     update,
     remove,

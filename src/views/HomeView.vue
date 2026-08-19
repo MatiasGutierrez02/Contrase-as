@@ -7,8 +7,13 @@ import { passwordAccent } from "@/utils/passwordAccent";
 
 const passwords = usePasswordsStore();
 onMounted(() => {
+  passwords.lock();
   void passwords.loadAll().catch(() => undefined);
 });
+
+function retryLoad() {
+  void passwords.loadAll().catch(() => undefined);
+}
 </script>
 
 <template>
@@ -34,13 +39,18 @@ onMounted(() => {
       >
     </section>
 
-    <section v-if="passwords.loading" class="empty-state" aria-live="polite">
+    <section
+      v-if="passwords.loading"
+      class="empty-state loading-state"
+      aria-live="polite"
+    >
+      <span class="loading-spinner" aria-hidden="true"></span>
       <p>Cargando tu bóveda…</p>
     </section>
     <section v-else-if="passwords.error" class="empty-state empty-state--error">
       <h2>No pudimos abrir tu bóveda</h2>
       <p>{{ passwords.error }}</p>
-      <button class="secondary-button" type="button" @click="passwords.loadAll">
+      <button class="secondary-button" type="button" @click="retryLoad">
         Reintentar
       </button>
     </section>

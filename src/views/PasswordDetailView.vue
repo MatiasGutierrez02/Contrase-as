@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import AppHeader from "@/components/AppHeader.vue";
 import type { PasswordEntry } from "@/models/PasswordEntry";
 import { usePasswordsStore } from "@/stores/passwords";
@@ -13,8 +13,17 @@ const entry = ref<PasswordEntry>();
 const loading = ref(true);
 const passwordVisible = ref(true);
 const copied = ref(false);
+const copyStatus = ref("Copiar contraseña");
 const confirmDelete = ref(false);
+const deleting = ref(false);
+const deleteError = ref("");
 const id = Number(route.params.id);
+
+onBeforeRouteLeave((to) => {
+  const editingCurrentEntry =
+    to.name === "password-edit" && Number(to.params.id) === id;
+  if (!editingCurrentEntry) passwords.lock();
+});
 
 onMounted(async () => {
   try {
@@ -28,19 +37,37 @@ onMounted(async () => {
 
 async function copyPassword() {
   if (!entry.value) return;
-  await navigator.clipboard.writeText(entry.value.password);
-  copied.value = true;
-  window.setTimeout(() => (copied.value = false), 1800);
+  try {
+    await navigator.clipboard.writeText(entry.value.password);
+    copied.value = true;
+    copyStatus.value = "Contraseña copiada";
+  } catch {
+    copyStatus.value = "No se pudo copiar";
+  }
+  window.setTimeout(() => {
+    copied.value = false;
+    copyStatus.value = "Copiar contraseña";
+  }, 1800);
+}
+
+function openDeleteConfirmation() {
+  deleteError.value = "";
+  confirmDelete.value = true;
 }
 
 async function removeEntry() {
   if (!entry.value?.id) return;
+  deleting.value = true;
+  deleteError.value = "";
   try {
     await passwords.remove(entry.value.id);
     confirmDelete.value = false;
     await router.push("/");
   } catch {
-    confirmDelete.value = false;
+    deleteError.value = passwords.error ?? "No se pudo eliminar la entrada.";
+    passwords.error = null;
+  } finally {
+    deleting.value = false;
   }
 }
 </script>
@@ -48,7 +75,12 @@ async function removeEntry() {
 <template>
   <main class="page detail-page">
     <AppHeader title="Detalle" back-to="/" />
-    <section v-if="loading" class="empty-state">
+    <section
+      v-if="loading"
+      class="empty-state loading-state"
+      aria-live="polite"
+    >
+      <span class="loading-spinner" aria-hidden="true"></span>
       <p>Verificá tu identidad para desbloquear esta cuenta…</p>
     </section>
     <section v-else-if="passwords.error" class="empty-state empty-state--error">
@@ -91,11 +123,17 @@ async function removeEntry() {
           </dd>
         </div>
       </dl>
-      <button class="primary-button" type="button" @click="copyPassword">
+      <button
+        class="primary-button"
+        :class="{ 'primary-button--success': copied }"
+        type="button"
+        aria-live="polite"
+        @click="copyPassword"
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M8 8h11v11H8z" />
           <path d="M5 16H4V4h12v1" /></svg
-        >{{ copied ? "Copiada" : "Copiar contraseña" }}
+        >{{ copyStatus }}
       </button>
       <div class="detail-actions">
         <RouterLink :to="`/passwords/${entry.id}/edit`" class="secondary-button"
@@ -103,7 +141,7 @@ async function removeEntry() {
         ><button
           class="danger-button"
           type="button"
-          @click="confirmDelete = true"
+          @click="openDeleteConfirmation"
         >
           Eliminar
         </button>
@@ -128,19 +166,24 @@ async function removeEntry() {
         <span class="dialog__icon">!</span>
         <h2 id="delete-title">¿Eliminar {{ entry?.name }}?</h2>
         <p>Esta acción eliminará la entrada de tu dispositivo.</p>
+        <p v-if="deleteError" class="form-error" role="alert">
+          {{ deleteError }}
+        </p>
         <div class="dialog__actions">
           <button
             class="secondary-button"
             type="button"
+            :disabled="deleting"
             @click="confirmDelete = false"
           >
             Cancelar</button
           ><button
             class="danger-button danger-button--filled"
             type="button"
+            :disabled="deleting"
             @click="removeEntry"
           >
-            Eliminar
+            {{ deleting ? "Eliminando…" : "Eliminar" }}
           </button>
         </div>
       </section>

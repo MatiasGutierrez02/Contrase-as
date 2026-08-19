@@ -20,6 +20,7 @@
   --primary: #7c3aed;
   --primary-soft: #ede9fe;
   --danger: #e11d48;
+  --success: #059669;
   --shadow: 0 14px 38px rgba(38, 26, 65, 0.08);
 }
 
@@ -27,13 +28,17 @@
   box-sizing: border-box;
 }
 html {
-  min-width: 320px;
+  width: 100%;
   min-height: 100%;
   background: inherit;
+  overflow-x: hidden;
+  scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom));
 }
 body {
-  min-width: 320px;
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   background:
     radial-gradient(
@@ -42,6 +47,8 @@ body {
       transparent 32rem
     ),
     var(--page-bg, #f4f2f8);
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
 }
 button,
 input {
@@ -50,6 +57,7 @@ input {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 button {
   color: inherit;
@@ -66,12 +74,26 @@ svg {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  outline-offset: 3px;
+}
+
+#app {
+  min-height: 100dvh;
+  overflow-x: clip;
+}
 
 .page {
-  width: min(100% - 2rem, 48rem);
+  width: min(
+    calc(100% - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right)),
+    48rem
+  );
   min-height: 100vh;
+  min-height: 100dvh;
   margin-inline: auto;
-  padding: 1.5rem 0 6rem;
+  padding: calc(1.5rem + env(safe-area-inset-top)) 0
+    calc(6rem + env(safe-area-inset-bottom));
 }
 .app-header {
   display: flex;
@@ -85,7 +107,10 @@ svg {
   min-width: 0;
 }
 .app-header h1 {
+  overflow: hidden;
   margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: clamp(1.55rem, 7vw, 2rem);
   letter-spacing: -0.045em;
 }
@@ -115,6 +140,9 @@ svg {
 .icon-button:hover {
   border-color: rgba(124, 58, 237, 0.4);
   transform: translateY(-1px);
+}
+.icon-button:active {
+  transform: scale(0.94);
 }
 
 .vault-intro {
@@ -201,6 +229,7 @@ svg {
   flex: 1;
   font-size: 1rem;
   font-weight: 720;
+  overflow-wrap: anywhere;
 }
 .password-card__arrow {
   z-index: 1;
@@ -209,7 +238,10 @@ svg {
 }
 .fab {
   position: fixed;
-  right: max(1.25rem, calc((100vw - 48rem) / 2));
+  right: max(
+    calc(1.25rem + env(safe-area-inset-right)),
+    calc((100vw - 48rem) / 2 + env(safe-area-inset-right))
+  );
   bottom: calc(1.4rem + env(safe-area-inset-bottom));
   z-index: 5;
   display: grid;
@@ -224,6 +256,9 @@ svg {
 }
 .fab:hover {
   transform: translateY(-3px) rotate(4deg);
+}
+.fab:active {
+  transform: scale(0.94);
 }
 .fab svg {
   width: 1.6rem;
@@ -288,6 +323,10 @@ svg {
   overflow-wrap: anywhere;
   font-weight: 650;
 }
+.password-value > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .password-value {
   display: flex;
   align-items: center;
@@ -295,7 +334,9 @@ svg {
   gap: 0.75rem;
 }
 .text-button {
-  padding: 0;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.5rem;
   border: 0;
   color: var(--primary);
   background: none;
@@ -317,7 +358,8 @@ svg {
   cursor: pointer;
   transition:
     transform 160ms ease,
-    filter 160ms ease;
+    filter 160ms ease,
+    background-color 160ms ease;
 }
 .primary-button {
   width: 100%;
@@ -331,6 +373,14 @@ svg {
 .danger-button:hover {
   filter: brightness(1.05);
   transform: translateY(-1px);
+}
+.primary-button:active,
+.secondary-button:active,
+.danger-button:active {
+  transform: scale(0.98);
+}
+.primary-button--success {
+  background: linear-gradient(135deg, #10b981, var(--success));
 }
 .detail-actions {
   display: grid;
@@ -354,6 +404,29 @@ svg {
 .empty-state {
   padding: 3rem 1rem;
   text-align: center;
+}
+.empty-state h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+.empty-state p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+.loading-state {
+  display: grid;
+  min-height: 12rem;
+  place-content: center;
+  justify-items: center;
+}
+.loading-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
 }
 .empty-state--vault {
   display: grid;
@@ -436,7 +509,7 @@ svg {
   outline: none;
   color: inherit;
   background: var(--surface-raised);
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 550;
   transition:
     border-color 160ms ease,
@@ -456,8 +529,9 @@ svg {
 .password-input button {
   position: absolute;
   top: 50%;
-  right: 0.9rem;
-  padding: 0;
+  right: 0.35rem;
+  min-height: 2.75rem;
+  padding: 0.5rem;
   border: 0;
   color: var(--primary);
   background: none;
@@ -474,6 +548,11 @@ svg {
   cursor: wait;
   filter: grayscale(0.2);
   opacity: 0.65;
+}
+.secondary-button:disabled,
+.danger-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 .form-error {
   margin: 0;
@@ -541,7 +620,8 @@ svg {
 }
 .theme-selector span {
   display: block;
-  padding: 0.7rem 0.35rem;
+  min-height: 2.75rem;
+  padding: 0.78rem 0.35rem;
   border-radius: 0.68rem;
   color: var(--muted);
   text-align: center;
@@ -560,20 +640,56 @@ svg {
   font-size: 0.72rem;
   line-height: 1.5;
 }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+.settings-feedback {
+  margin: 0.8rem 0 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.75rem;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.1);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.settings-feedback--error {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.backup-password-field {
+  margin-top: 1rem;
+}
 .settings-row {
   display: flex;
   width: 100%;
   align-items: center;
   justify-content: space-between;
   padding: 0.9rem 0;
+  min-height: 4rem;
   border: 0;
   border-top: 1px solid var(--border);
   background: transparent;
   text-align: left;
   cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+.settings-row:hover {
+  color: var(--primary);
+}
+.settings-row:active {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 .settings-row > span:first-child {
   display: grid;
+  min-width: 0;
   gap: 0.18rem;
 }
 .settings-row > span:last-child {
@@ -582,6 +698,7 @@ svg {
 }
 .settings-row small {
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 .about-row {
   display: flex;
@@ -595,7 +712,9 @@ svg {
   color: var(--muted);
 }
 .about-row strong {
+  min-width: 0;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .dialog-backdrop {
@@ -604,12 +723,75 @@ svg {
   z-index: 20;
   display: grid;
   place-items: end center;
-  padding: 1rem;
+  padding: calc(1rem + env(safe-area-inset-top))
+    calc(1rem + env(safe-area-inset-right))
+    calc(1rem + env(safe-area-inset-bottom))
+    calc(1rem + env(safe-area-inset-left));
   background: rgba(7, 5, 14, 0.65);
   backdrop-filter: blur(8px);
 }
+.pwa-status {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  z-index: 30;
+  display: flex;
+  max-width: 30rem;
+  align-items: center;
+  gap: 0.75rem;
+  margin-inline: auto;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface-solid);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.25);
+}
+.pwa-status > span {
+  display: grid;
+  flex: 1;
+  gap: 0.12rem;
+}
+.pwa-status strong {
+  font-size: 0.82rem;
+}
+.pwa-status small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.pwa-status button {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  border-radius: 0.7rem;
+  color: #fff;
+  background: var(--primary);
+  font-size: 0.74rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+.pwa-status button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.pwa-status .pwa-status__dismiss {
+  width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.35rem;
+  color: var(--muted);
+  background: transparent;
+  font-size: 1.1rem;
+}
+.pwa-status--offline {
+  border-color: rgba(245, 158, 11, 0.25);
+}
 .dialog {
   width: min(100%, 26rem);
+  max-height: calc(
+    100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.35rem;
   border: 1px solid var(--border);
   border-radius: 1.4rem;
@@ -634,6 +816,9 @@ svg {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+}
+.dialog strong {
+  overflow-wrap: anywhere;
 }
 .dialog__actions {
   display: grid;
@@ -661,16 +846,44 @@ svg {
     transform: translateY(20px) scale(0.98);
   }
 }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.detail-page,
+.form-page {
+  max-width: 38rem;
+}
+.settings-page {
+  max-width: 44rem;
+}
 
 @media (min-width: 40rem) {
   .page {
-    padding-top: 2.5rem;
+    padding-top: calc(2.5rem + env(safe-area-inset-top));
   }
   .password-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   .dialog-backdrop {
     place-items: center;
+  }
+}
+@media (max-width: 24rem) {
+  .page {
+    width: calc(
+      100% - 1.25rem - env(safe-area-inset-left) - env(safe-area-inset-right)
+    );
+  }
+  .detail-actions,
+  .dialog__actions {
+    grid-template-columns: 1fr;
+  }
+  .vault-intro {
+    align-items: start;
+    flex-direction: column;
   }
 }
 @media (prefers-reduced-motion: reduce) {

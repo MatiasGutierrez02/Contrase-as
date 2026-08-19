@@ -71,7 +71,11 @@ async function loadOrCreateKeys(
   const stored = await database.cryptoKeys.get("primary");
   if (stored) return stored;
   const generated = await generateVaultKeyPair();
-  const legacyKeys: LegacyStoredVaultKeyPair = { id: "primary", ...generated };
+  const legacyKeys: LegacyStoredVaultKeyPair = {
+    id: "primary",
+    publicKey: generated.publicKey,
+    privateKey: await makePrivateKeyNonExtractable(generated.privateKey),
+  };
   try {
     await database.cryptoKeys.add(legacyKeys);
     return legacyKeys;
@@ -205,6 +209,16 @@ export function createPasswordRepository(database: PasswordVaultDatabase) {
         : undefined;
     },
 
+    async listAll(privateKey: CryptoKey): Promise<PasswordEntry[]> {
+      await migratePlaintextEntries();
+      const records = await database.passwords.toArray();
+      return Promise.all(
+        records.map((record) =>
+          decryptRecord(record as EncryptedPasswordRecord, privateKey),
+        ),
+      );
+    },
+
     async create(entry: PasswordEntryInput): Promise<number> {
       const id = await database.passwords.add(await encryptRecord(entry));
       if (id === undefined)
@@ -222,6 +236,45 @@ export function createPasswordRepository(database: PasswordVaultDatabase) {
 
     async remove(id: number): Promise<void> {
       await database.passwords.delete(id);
+    },
+
+    async importUnique(
+      entries: PasswordEntryInput[],
+      privateKey: CryptoKey,
+    ): Promise<number> {
+      await migratePlaintextEntries();
+      return database.transaction("rw", database.passwords, async () => {
+        const records = await database.passwords.toArray();
+        const existing = await Dexie.waitFor(
+          Promise.all(
+            records.map((record) =>
+              decryptRecord(record as EncryptedPasswordRecord, privateKey),
+            ),
+          ),
+        );
+        const fingerprints = new Set(
+          existing.map((entry) =>
+            JSON.stringify([entry.name, entry.username, entry.password]),
+          ),
+        );
+        const uniqueEntries = entries.filter((entry) => {
+          const fingerprint = JSON.stringify([
+            entry.name,
+            entry.username,
+            entry.password,
+          ]);
+          if (fingerprints.has(fingerprint)) return false;
+          fingerprints.add(fingerprint);
+          return true;
+        });
+        const encryptedEntries = await Dexie.waitFor(
+          Promise.all(uniqueEntries.map((entry) => encryptRecord(entry))),
+        );
+        if (encryptedEntries.length) {
+          await database.passwords.bulkAdd(encryptedEntries);
+        }
+        return encryptedEntries.length;
+      });
     },
 
     migratePlaintextEntries,
