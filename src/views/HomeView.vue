@@ -40,6 +40,10 @@ onMounted(() => {
 function retryLoad() {
   void passwords.loadAll().catch(() => undefined);
 }
+
+function updateSearch(event: Event) {
+  searchQuery.value = (event.currentTarget as HTMLInputElement).value;
+}
 </script>
 
 <template>
@@ -71,12 +75,13 @@ function retryLoad() {
         <path d="m20 20-4-4" />
       </svg>
       <input
-        v-model="searchQuery"
+        :value="searchQuery"
         type="search"
         placeholder="Buscar contraseña…"
         aria-label="Buscar contraseñas"
         autocomplete="off"
         spellcheck="false"
+        @input="updateSearch"
       />
       <span v-if="searchQuery" class="vault-search__count" aria-live="polite">
         {{ filteredEntries.length }}
