@@ -16,13 +16,20 @@ function normalizeSearch(value: string) {
     .trim();
 }
 
+const searchableEntries = computed(() =>
+  passwords.entries.map((entry) => ({
+    entry,
+    normalizedName: normalizeSearch(entry.name),
+  })),
+);
+
 const filteredEntries = computed(() => {
   const query = normalizeSearch(searchQuery.value);
   if (!query) return passwords.entries;
 
-  return passwords.entries.filter((entry) =>
-    normalizeSearch(entry.name).includes(query),
-  );
+  return searchableEntries.value
+    .filter(({ normalizedName }) => normalizedName.includes(query))
+    .map(({ entry }) => entry);
 });
 
 onMounted(() => {

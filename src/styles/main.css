@@ -31,7 +31,8 @@ html {
   width: 100%;
   min-height: 100%;
   background: inherit;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: auto;
   scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom));
 }
 body {
@@ -47,7 +48,8 @@ body {
       transparent 32rem
     ),
     var(--page-bg, #f4f2f8);
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   overscroll-behavior-y: none;
 }
 button,
