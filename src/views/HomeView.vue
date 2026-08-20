@@ -1,11 +1,30 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import AppHeader from "@/components/AppHeader.vue";
 import PasswordCard from "@/components/PasswordCard.vue";
 import { usePasswordsStore } from "@/stores/passwords";
 import { passwordAccent } from "@/utils/passwordAccent";
 
 const passwords = usePasswordsStore();
+const searchQuery = ref("");
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .trim();
+}
+
+const filteredEntries = computed(() => {
+  const query = normalizeSearch(searchQuery.value);
+  if (!query) return passwords.entries;
+
+  return passwords.entries.filter((entry) =>
+    normalizeSearch(entry.name).includes(query),
+  );
+});
+
 onMounted(() => {
   passwords.lock();
   void passwords.loadAll().catch(() => undefined);
@@ -39,6 +58,24 @@ function retryLoad() {
       >
     </section>
 
+    <div v-if="passwords.entries.length" class="vault-search">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-4-4" />
+      </svg>
+      <input
+        v-model="searchQuery"
+        type="search"
+        placeholder="Buscar contraseña…"
+        aria-label="Buscar contraseñas"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <span v-if="searchQuery" class="vault-search__count" aria-live="polite">
+        {{ filteredEntries.length }}
+      </span>
+    </div>
+
     <section
       v-if="passwords.loading"
       class="empty-state loading-state"
@@ -55,17 +92,28 @@ function retryLoad() {
       </button>
     </section>
     <section
-      v-else-if="passwords.entries.length"
+      v-else-if="filteredEntries.length"
       class="password-grid"
       aria-label="Contraseñas guardadas"
     >
       <PasswordCard
-        v-for="entry in passwords.entries"
+        v-for="entry in filteredEntries"
         :id="entry.id!"
         :key="entry.id"
         :name="entry.name"
         :accent="passwordAccent(entry.name)"
       />
+    </section>
+    <section
+      v-else-if="passwords.entries.length"
+      class="empty-state empty-state--search"
+      aria-live="polite"
+    >
+      <h2>Sin coincidencias</h2>
+      <p>No encontramos ninguna contraseña con “{{ searchQuery }}”.</p>
+      <button class="secondary-button" type="button" @click="searchQuery = ''">
+        Limpiar búsqueda
+      </button>
     </section>
     <section v-else class="empty-state empty-state--vault">
       <span class="empty-state__icon">+</span>

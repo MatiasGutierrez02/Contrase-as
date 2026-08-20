@@ -163,6 +163,56 @@ svg {
   font-size: 0.78rem;
   font-weight: 700;
 }
+.vault-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.vault-search > svg {
+  position: absolute;
+  left: 1rem;
+  z-index: 1;
+  width: 1.15rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+.vault-search input {
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.75rem 3.1rem 0.75rem 2.85rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  outline: none;
+  color: inherit;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(38, 26, 65, 0.05);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.vault-search input::placeholder {
+  color: var(--muted);
+}
+.vault-search input:focus {
+  border-color: rgba(124, 58, 237, 0.55);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+.vault-search__count {
+  position: absolute;
+  right: 0.9rem;
+  display: grid;
+  min-width: 1.7rem;
+  min-height: 1.7rem;
+  place-items: center;
+  padding: 0.2rem 0.45rem;
+  border-radius: 2rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-size: 0.72rem;
+  font-weight: 800;
+  pointer-events: none;
+}
 .password-grid {
   display: grid;
   gap: 0.75rem;
@@ -462,6 +512,10 @@ svg {
 .empty-state--error .secondary-button {
   width: fit-content;
   margin: 1rem auto;
+}
+.empty-state--search .secondary-button {
+  width: fit-content;
+  margin: 1rem auto 0;
 }
 
 .entry-form {
